@@ -30,7 +30,7 @@ jobs:
           python-version: "3.11"
 
       - name: Install dependencies
-        run: pip install openai==1.30.5 requests==2.32.3
+        run: pip install "openai>=1.52.0" requests==2.32.3
 
       - name: Find changed skill files
         id: find_skill
