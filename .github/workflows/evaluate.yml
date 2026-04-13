@@ -20,7 +20,8 @@ jobs:
       - name: Checkout PR
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
+          # Default (no ref) checks out the merge commit — gives us .github/scripts
+          # from main AND the skill files from the PR branch in one tree.
           fetch-depth: 0
 
       - name: Set up Python
@@ -34,8 +35,11 @@ jobs:
       - name: Find changed skill files
         id: find_skill
         run: |
-          # Find .md files added/changed in submissions/ (exclude meta files)
-          SKILL_FILE=$(git diff --name-only origin/${{ github.event.pull_request.base.ref }}..HEAD \
+          # Find .md files added/changed in submissions/ (exclude meta files).
+          # Use the PR head SHA vs base SHA for a clean diff on the merge commit.
+          SKILL_FILE=$(git diff --name-only \
+            ${{ github.event.pull_request.base.sha }} \
+            ${{ github.event.pull_request.head.sha }} \
             | grep '^submissions/.*\.md$' \
             | grep -v '\.meta\.' \
             | head -1)
