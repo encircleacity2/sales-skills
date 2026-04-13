@@ -29,7 +29,7 @@ jobs:
           python-version: "3.11"
 
       - name: Install dependencies
-        run: pip install anthropic==0.28.0 requests==2.32.3
+        run: pip install openai==1.30.5 requests==2.32.3
 
       - name: Find changed skill files
         id: find_skill
@@ -77,7 +77,7 @@ jobs:
         if: steps.find_skill.outputs.found == 'true'
         id: evaluate
         env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          ARK_API_KEY: ${{ secrets.ARK_API_KEY }}
           SKILL_FILE: ${{ steps.find_skill.outputs.skill_file }}
           META_FILE: ${{ steps.find_skill.outputs.meta_file }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
