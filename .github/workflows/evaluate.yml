@@ -1,0 +1,111 @@
+name: Evaluate Skill
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+    paths:
+      - "submissions/**"
+
+permissions:
+  pull-requests: write
+  contents: read
+
+jobs:
+  evaluate:
+    name: Run evaluation pipeline
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout PR
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install anthropic==0.28.0 requests==2.32.3
+
+      - name: Find changed skill files
+        id: find_skill
+        run: |
+          # Find .md files added/changed in submissions/ (exclude meta files)
+          SKILL_FILE=$(git diff --name-only origin/${{ github.event.pull_request.base.ref }}..HEAD \
+            | grep '^submissions/.*\.md$' \
+            | grep -v '\.meta\.' \
+            | head -1)
+
+          if [ -z "$SKILL_FILE" ]; then
+            echo "No skill file found in this PR."
+            echo "found=false" >> $GITHUB_OUTPUT
+          else
+            echo "found=true" >> $GITHUB_OUTPUT
+            echo "skill_file=$SKILL_FILE" >> $GITHUB_OUTPUT
+            # Derive meta file path
+            META_FILE="${SKILL_FILE%.md}.meta.json"
+            echo "meta_file=$META_FILE" >> $GITHUB_OUTPUT
+            echo "Skill: $SKILL_FILE"
+            echo "Meta:  $META_FILE"
+          fi
+
+      - name: Post "evaluation started" comment
+        if: steps.find_skill.outputs.found == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh pr comment ${{ github.event.pull_request.number }} \
+            --body "$(cat <<'EOF'
+          <!-- evaluation-started -->
+          ## Skill Evaluation Started
+
+          The AI evaluator is now running your skill through the full pipeline:
+          1. Skill Introspection
+          2. Test Case Generation (3–5 scenarios)
+          3. Simulated Execution
+          4. Scoring & Judgment
+
+          Results will be posted here shortly.
+          EOF
+          )"
+
+      - name: Run evaluation
+        if: steps.find_skill.outputs.found == 'true'
+        id: evaluate
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          SKILL_FILE: ${{ steps.find_skill.outputs.skill_file }}
+          META_FILE: ${{ steps.find_skill.outputs.meta_file }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: python .github/scripts/evaluate.py
+
+      - name: Post evaluation results
+        if: steps.find_skill.outputs.found == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RESULTS_FILE: /tmp/evaluation-results.md
+        run: |
+          if [ -f "$RESULTS_FILE" ]; then
+            gh pr comment ${{ github.event.pull_request.number }} --body-file "$RESULTS_FILE"
+          else
+            gh pr comment ${{ github.event.pull_request.number }} \
+              --body "Evaluation pipeline encountered an error. Please check the workflow logs."
+          fi
+
+      - name: Auto-approve excellent skills
+        if: steps.find_skill.outputs.found == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SCORE_FILE: /tmp/evaluation-score.txt
+        run: |
+          if [ -f "$SCORE_FILE" ]; then
+            SCORE=$(cat "$SCORE_FILE")
+            if [ "$SCORE" -ge 85 ] 2>/dev/null; then
+              gh pr review ${{ github.event.pull_request.number }} --approve \
+                --body "Auto-approved: Excellent score ($SCORE/100)"
+            fi
+          fi
