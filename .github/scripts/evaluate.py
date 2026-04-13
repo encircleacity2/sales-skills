@@ -7,6 +7,7 @@ Pipeline: introspect → generate tests → simulate execution → judge → sco
 
 import os
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -52,13 +53,44 @@ def llm(system: str, user: str, temperature: float = 0.3) -> str:
 def llm_json(system: str, user: str) -> dict | list:
     prompt = user + "\n\nRespond with ONLY valid JSON — no markdown fences, no explanation."
     raw = llm(system, prompt, temperature=0.1)
-    # Strip accidental code fences
     raw = raw.strip()
-    if raw.startswith("```"):
-        raw = raw.split("```")[1]
-        if raw.startswith("json"):
-            raw = raw[4:]
-        raw = raw.strip()
+
+    # Strip markdown code fences if present
+    if "```" in raw:
+        blocks = re.findall(r"```(?:json)?\s*([\s\S]*?)```", raw)
+        if blocks:
+            raw = blocks[0].strip()
+
+    # Extract the first complete JSON object or array using brace/bracket matching
+    # This handles extra trailing text after the JSON
+    for start_char, end_char in [('{', '}'), ('[', ']')]:
+        idx = raw.find(start_char)
+        if idx == -1:
+            continue
+        depth = 0
+        in_string = False
+        escape_next = False
+        for i, ch in enumerate(raw[idx:], start=idx):
+            if escape_next:
+                escape_next = False
+                continue
+            if ch == '\\' and in_string:
+                escape_next = True
+                continue
+            if ch == '"':
+                in_string = not in_string
+                continue
+            if in_string:
+                continue
+            if ch == start_char:
+                depth += 1
+            elif ch == end_char:
+                depth -= 1
+                if depth == 0:
+                    raw = raw[idx:i+1]
+                    break
+        break
+
     return json.loads(raw)
 
 
