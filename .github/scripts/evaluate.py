@@ -61,9 +61,16 @@ def llm_json(system: str, user: str) -> dict | list:
         if blocks:
             raw = blocks[0].strip()
 
-    # Extract the first complete JSON object or array using brace/bracket matching
-    # This handles extra trailing text after the JSON
-    for start_char, end_char in [('{', '}'), ('[', ']')]:
+    # Extract the first complete JSON object or array using brace/bracket matching.
+    # Prefer whichever delimiter appears first in the string so arrays aren't
+    # accidentally parsed as objects (finding '{' inside '[{...}]').
+    obj_idx   = raw.find('{')
+    arr_idx   = raw.find('[')
+    if arr_idx != -1 and (obj_idx == -1 or arr_idx < obj_idx):
+        ordered = [('[', ']'), ('{', '}')]
+    else:
+        ordered = [('{', '}'), ('[', ']')]
+    for start_char, end_char in ordered:
         idx = raw.find(start_char)
         if idx == -1:
             continue
