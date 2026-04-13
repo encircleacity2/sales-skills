@@ -190,7 +190,11 @@ Return a JSON array of exactly 4 objects:
   ...
 ]"""
 
-    return llm_json(system, user)
+    result = llm_json(system, user)
+    # Normalize: Seed 2.0 Pro sometimes returns {"1": {...}, ...} instead of [{...}]
+    if isinstance(result, dict):
+        result = list(result.values())
+    return result
 
 
 # ─────────────────────────────────────────────
