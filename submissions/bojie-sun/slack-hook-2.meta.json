@@ -1,0 +1,8 @@
+{
+  "repName": "Bojie Sun",
+  "repEmail": "bojie.sun@bytedance.com",
+  "skillName": "slack hook #2",
+  "category": "Other",
+  "rationale": "I manage multiple Slack channels where customers report issues and give feedback. Every morning I used to manually scroll through all channels to catch anything urgent — this would take 20-30 minutes and I'd still miss things. This skill automates that entirely: it pulls all messages from the last 24 hours across every relevant channel, categorises them by type (bugs, feature requests, pricing concerns, escalations), and generates a clean HTML report I can open in one click. Now my morning review takes under a minute.",
+  "submittedAt": "2026-04-13T09:44:21.777Z"
+}
